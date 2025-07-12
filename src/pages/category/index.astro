@@ -154,7 +154,7 @@ const pageKeywords = `kategori video, daftar kategori, ${nama} kategori, nonton 
     ) : (
       <div class="category-list">
         {categories.map(category => (
-          <a href={`${url}/category/${category.slug}/1`} class="category-item" title={`Lihat semua video di kategori ${category.name}`}>
+          <a href={`${url}/category/${category.slug}/`} class="category-item" title={`Lihat semua video di kategori ${category.name}`}>
             {category.thumbnail && (
               <div class="category-thumbnail-wrapper">
                 <img
