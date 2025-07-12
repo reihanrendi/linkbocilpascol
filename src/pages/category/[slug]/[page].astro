@@ -86,7 +86,7 @@ export async function getStaticPaths() {
 const { categoryName, currentPage, totalPages, videos: paginatedVideos, preconnectDomains } = Astro.props;
 
 const currentUrl = new URL(Astro.url.pathname, url).href;
-const prevPageUrl = currentPage > 1 ? `${url}/category/${slugify(categoryName)}/${currentPage - 1}` : null;
+const prevPageUrl = currentPage > 1 ? `${url}/category/${slugify(categoryName)}/${currentPage - 1 === 1 ? '' : currentPage - 1}` : null;
 const nextPageUrl = currentPage < totalPages ? `${url}/category/${slugify(categoryName)}/${currentPage + 1}` : null;
 
 let ogImageForCategoryPage = new URL('/logo.png', url).href;
