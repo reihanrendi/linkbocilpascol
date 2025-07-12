@@ -7,7 +7,6 @@ import { slugify } from '../../../utils/slugify';
 import { desk, nama, url } from '../../../utils/site';
 
 export const prerender = true;
-
 export async function getStaticPaths() {
   const allVideos: VideoData[] = await getAllVideos();
   const videosPerPage = 40;
@@ -29,10 +28,28 @@ export async function getStaticPaths() {
 
   for (const categoryName in categories) {
     const categoryVideos = categories[categoryName].sort(() => 0.5 - Math.random());
+
     const categorySlug = slugify(categoryName);
     const totalPages = Math.ceil(categoryVideos.length / videosPerPage);
 
-    for (let i = 2; i <= totalPages; i++) {
+    if (totalPages === 0) {
+      paths.push({
+        params: {
+          slug: categorySlug,
+          page: '1',
+        },
+        props: {
+          categoryName,
+          currentPage: 1,
+          totalPages: 1,
+          videos: [],
+          preconnectDomains: [],
+        },
+      });
+      continue;
+    }
+
+    for (let i = 1; i <= totalPages; i++) {
       const startIndex = (i - 1) * videosPerPage;
       const endIndex = startIndex + videosPerPage;
       const paginatedVideosForPage = categoryVideos.slice(startIndex, endIndex);
@@ -68,12 +85,9 @@ export async function getStaticPaths() {
 
 const { categoryName, currentPage, totalPages, videos: paginatedVideos, preconnectDomains } = Astro.props;
 
-const currentUrl = `${url}/category/${slugify(categoryName)}/${currentPage}/`;
-
-const prevPageUrl = currentPage === 2
-  ? `${url}/category/${slugify(categoryName)}/`
-  : `${url}/category/${slugify(categoryName)}/${currentPage - 1}/`;
-const nextPageUrl = currentPage < totalPages ? `${url}/category/${slugify(categoryName)}/${currentPage + 1}/` : null;
+const currentUrl = new URL(Astro.url.pathname, url).href;
+const prevPageUrl = currentPage > 1 ? `${url}/category/${slugify(categoryName)}/${currentPage - 1}` : null;
+const nextPageUrl = currentPage < totalPages ? `${url}/category/${slugify(categoryName)}/${currentPage + 1}` : null;
 
 let ogImageForCategoryPage = new URL('/logo.png', url).href;
 
@@ -162,7 +176,6 @@ const pageKeywords = `${categoryName}, video ${categoryName}, nonton ${categoryN
 
   {prevPageUrl && <link rel="prev" href={prevPageUrl} />}
   {nextPageUrl && <link rel="next" href={nextPageUrl} />}
-  <link rel="canonical" href={currentUrl} />
 
   <main class="category-page" itemscope itemtype="http://schema.org/CollectionPage">
     <nav class="breadcrumb" aria-label="breadcrumb">
@@ -210,7 +223,7 @@ const pageKeywords = `${categoryName}, video ${categoryName}, nonton ${categoryN
                 <span class="pagination-link ellipsis" aria-hidden="true">...</span>
               )}
               <a
-                href={pageNumber === 1 ? `${url}/category/${slugify(categoryName)}/` : `${url}/category/${slugify(categoryName)}/${pageNumber}/`}
+                href={`${url}/category/${slugify(categoryName)}/${pageNumber}`}
                 class={`pagination-link ${pageNumber === currentPage ? 'active' : ''}`}
                 aria-current={pageNumber === currentPage ? 'page' : undefined}
               >

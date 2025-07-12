@@ -7,7 +7,7 @@ import { slugify } from '../../../utils/slugify.ts';
 import { desk, nama, url } from '../../../utils/site';
 
 export async function getStaticPaths() {
-  return [];
+  return []; 
 }
 
 const { slug, page } = Astro.params;
@@ -40,7 +40,6 @@ let preconnectDomains: string[] = [];
 let totalPages = 1;
 let paginatedResults: VideoData[] = [];
 let randomPostsBelowSearch: VideoData[] = [];
-let searchResultsCount = 0;
 
 const allVideos: VideoData[] = await getAllVideos();
 
@@ -111,7 +110,18 @@ if (searchWords.length > 0) {
     const startIndex = (validCurrentPage - 1) * videosPerPage;
     const endIndex = startIndex + videosPerPage;
     paginatedResults = searchResults.slice(startIndex, endIndex);
-    searchResultsCount = searchResults.length;
+
+    const numberOfRandomPosts = 12;
+    
+    const allSearchResultIds = new Set(searchResults.map(v => v.id));
+
+    const videosNotIncludedInSearch = allVideos.filter(video => 
+        !allSearchResultIds.has(video.id)
+    );
+
+    randomPostsBelowSearch = videosNotIncludedInSearch
+        .sort(() => 0.5 - Math.random())
+        .slice(0, numberOfRandomPosts);
 
     const domainsSet = new Set<string>();
     paginatedResults.forEach(video => {
@@ -170,12 +180,7 @@ function capitalizeWords(str: string): string {
 }
 
 const displayQuery = capitalizeWords(originalQuery);
-const currentUrl = `${url}/video/${originalQuery}/${currentPage}/`;
-
-const prevPageUrl = currentPage === 2
-  ? `${baseSearchUrl}/`
-  : `${baseSearchUrl}/${currentPage - 1}/`;
-const nextPageUrl = currentPage < totalPages ? `${baseSearchUrl}/${currentPage + 1}/` : null;
+const currentUrl = new URL(Astro.url.pathname, url).href;
 
 let ogImageForSearchPage = new URL('/logo.png', url).href;
 
@@ -193,8 +198,7 @@ if (firstValidPaginatedThumbnail && firstValidPaginatedThumbnail.thumbnail) {
 }
 const breadcrumbs = [
   { name: 'Home', url: `${url}` },
-  { name: `Pencarian: ${displayQuery}`, url: `${baseSearchUrl}/` },
-  { name: `Halaman ${currentPage}` },
+  { name: `Pencarian: ${displayQuery}`, url: null },
 ];
 
 const schemaBreadcrumb = {
@@ -226,7 +230,7 @@ const schemaSearchResultsPage = {
     "@type": "SearchAction",
     "target": {
       "@type": "EntryPoint",
-      "urlTemplate": `${url}/video/{query}/`
+      "urlTemplate": `${url}/video/{query}/1`
     },
     "query-input": "required name=query"
   },
@@ -248,11 +252,13 @@ const pageSchemas = [
   schemaSearchResultsPage
 ];
 
+const prevPageUrl = currentPage > 1 ? `${baseSearchUrl}/${currentPage - 1}` : null;
+const nextPageUrl = currentPage < totalPages ? `${baseSearchUrl}/${currentPage + 1}` : null;
 ---
 
 <Layout
-  title={`${displayQuery} di ${nama} | Halaman ${currentPage}`}
-  description={`${displayQuery} ${desk} di ${nama}. Halaman ${currentPage}.`}
+  title={`${displayQuery} di ${nama} | Page ${currentPage}`}
+  description={`${displayQuery} ${desk} di ${nama}. Page ${currentPage}.`}
   ogImage={ogImageForSearchPage}
   preconnectDomains={preconnectDomains}
   schemaJsonLd={pageSchemas}
@@ -261,7 +267,6 @@ const pageSchemas = [
 >
   {prevPageUrl && <link rel="prev" href={prevPageUrl} />}
   {nextPageUrl && <link rel="next" href={nextPageUrl} />}
-  <link rel="canonical" href={currentUrl} />
 
   <main class="search-page" itemscope itemtype="http://schema.org/SearchResultsPage">
     <nav class="breadcrumb" aria-label="breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList">
@@ -281,11 +286,15 @@ const pageSchemas = [
         ))}
       </ol>
     </nav>
-    <h1 class="search-results-title" itemprop="headline">{`${displayQuery} di ${nama} - Halaman ${currentPage}`}</h1>
+    <h1 class="search-results-title" itemprop="headline">{`${displayQuery} di ${nama}`}</h1>
 
-    {originalQuery === '' || searchResultsCount === 0 ? (
+    {originalQuery === '' || searchWords.length === 0 ? (
       <p class="no-results-message">
-        {originalQuery === '' ? 'Silakan masukkan kata kunci di kolom pencarian di atas untuk memulai pencarian video.' : 'Maaf, tidak ada video yang cocok dengan pencarian Anda. Coba kata kunci lain.'}
+        Silakan masukkan kata kunci di kolom pencarian di atas untuk memulai pencarian video.
+      </p>
+    ) : paginatedResults.length === 0 ? (
+      <p class="no-results-message">
+        Maaf, tidak ada video yang cocok dengan pencarian Anda. Coba kata kunci lain.
       </p>
     ) : (
       <div class="video-grid" itemprop="mainContentOfPage">
@@ -295,7 +304,7 @@ const pageSchemas = [
       </div>
     )}
 
-    {searchResultsCount === 0 && randomPostsBelowSearch.length > 0 && (
+    {paginatedResults.length === 0 && randomPostsBelowSearch.length > 0 && (
       <section class="random-videos-section">
         <h2 class="section-title">Video Mungkin Anda Suka</h2>
         <div class="video-grid">
@@ -309,22 +318,22 @@ const pageSchemas = [
     {totalPages > 1 && (
       <nav class="pagination" aria-label="Navigasi Page Pencarian">
         {currentPage > 1 && (
-          <a href={prevPageUrl} class="pagination-link" rel="prev">&laquo; Sebelumnya</a>
+          <a href={`${baseSearchUrl}/${currentPage - 1}`} class="pagination-link">&laquo; Sebelumnya</a>
         )}
         {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p =>
           p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2)
         ).map(pageNumber => (
           <a
-            href={pageNumber === 1 ? `${baseSearchUrl}/` : `${baseSearchUrl}/${pageNumber}/`}
+            href={`${baseSearchUrl}/${pageNumber}`}
             class={`pagination-link ${pageNumber === currentPage ? 'active' : ''}`}
             { ... (pageNumber === currentPage && { 'aria-current': 'page' }) }
           >
             {pageNumber}
           </a>
         ))}
-        {(currentPage + 2 < totalPages && totalPages > 5 && currentPage < totalPages - 2) && <span class="pagination-link ellipsis">...</span>}
+        {(currentPage + 2 < totalPages && totalPages > 5) && (currentPage < totalPages - 2) && <span class="pagination-link ellipsis">...</span>}
         {currentPage < totalPages && (
-          <a href={nextPageUrl} class="pagination-link" rel="next">Berikutnya &raquo;</a>
+          <a href={`${baseSearchUrl}/${currentPage + 1}`} class="pagination-link">Berikutnya &raquo;</a>
         )}
       </nav>
     )}
